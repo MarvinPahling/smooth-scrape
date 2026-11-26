@@ -1,0 +1,112 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource/barlow/400.css";
+@import "@fontsource/barlow/500.css";
+@import "@fontsource/barlow/600.css";
+@import "@fontsource/barlow-condensed/600.css";
+@import "@fontsource/barlow-condensed/700.css";
+@import "@fontsource/barlow-condensed/800.css";
+
+@theme inline {
+  --font-heading: "Barlow Condensed", "Arial Narrow", Impact, sans-serif;
+  --font-sans: "Barlow", "Helvetica Neue", Arial, sans-serif;
+  --color-primary-deep: var(--primary-deep);
+  --color-gold: var(--gold);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/*
+ * Palette from academiabraunschweig.de: bright hall daylight, mat-black type,
+ * the red of the mat circle as the only strong accent. Light only.
+ *   matte #f4f5f2 · flaeche #fff · kante #dcdfd9 · kreide #15161a
+ *   staub #5a5e66 · rot #e03a26 · rot-tief #bd2c1a · gold #a8750f
+ */
+:root {
+  color-scheme: light;
+  --background: #f4f5f2;
+  --foreground: #15161a;
+  --card: #ffffff;
+  --card-foreground: #15161a;
+  --popover: #ffffff;
+  --popover-foreground: #15161a;
+  --primary: #e03a26;
+  --primary-deep: #bd2c1a;
+  --primary-foreground: #ffffff;
+  --secondary: #f4f5f2;
+  --secondary-foreground: #15161a;
+  --muted: #f4f5f2;
+  --muted-foreground: #5a5e66;
+  --accent: #fdebe7;
+  --accent-foreground: #bd2c1a;
+  --destructive: #dc2626;
+  --border: #dcdfd9;
+  --input: #dcdfd9;
+  --ring: #a8750f;
+  --gold: #a8750f;
+  --chart-1: #e03a26;
+  --chart-2: #2563eb;
+  --chart-3: #0d9488;
+  --chart-4: #f59e0b;
+  --chart-5: #64748b;
+  --radius: 1rem;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-size: 17px;
+    line-height: 1.55;
+  }
+  h1,
+  h2,
+  h3 {
+    @apply font-heading uppercase;
+    line-height: 0.98;
+    letter-spacing: 0.01em;
+    text-wrap: balance;
+  }
+  :focus-visible {
+    outline: 3px solid var(--gold);
+    outline-offset: 2px;
+  }
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+}
