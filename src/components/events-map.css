@@ -1,0 +1,52 @@
+.event-map .maplibregl-map {
+  /* MapLibre's unlayered position:relative overrides Tailwind utilities. */
+  position: absolute;
+  inset: 0;
+  font-family: var(--font-sans);
+  background: #eceee9;
+}
+.event-map .maplibregl-ctrl-group {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px #15161a18;
+}
+.event-map .maplibregl-ctrl-group button {
+  width: 42px;
+  height: 42px;
+}
+.event-map .maplibregl-ctrl-attrib {
+  font-size: 10px;
+}
+.event-map-home {
+  border: 2px solid white;
+  border-radius: 8px;
+  padding: 5px 9px;
+  background: #d73722;
+  color: white;
+  font:
+    600 12px Barlow,
+    sans-serif;
+  box-shadow: 0 2px 8px #15161a35;
+  pointer-events: none;
+}
+.event-map-home::after {
+  content: "";
+  position: absolute;
+  left: calc(50% - 1px);
+  top: 100%;
+  height: 34px;
+  width: 2px;
+  background: #d73722;
+}
+.event-map-home::before {
+  content: "";
+  position: absolute;
+  left: calc(50% - 5px);
+  top: calc(100% + 30px);
+  width: 10px;
+  height: 10px;
+  border: 2px solid white;
+  border-radius: 50%;
+  background: #d73722;
+}

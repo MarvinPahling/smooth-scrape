@@ -2,6 +2,7 @@
 // so it can be unit-tested and shared by the URL (route search params).
 import type { BjjEvent } from "@/lib/collections"
 import { addDays } from "@/lib/dates"
+import { distanceFromHome } from "@/lib/geo"
 import {
   DEFAULT_COUNTRY,
   DISCIPLINE_LABELS,
@@ -29,7 +30,13 @@ const isDiscipline = (value: string): value is Discipline =>
 /** Country filter value meaning "don't filter by country". */
 export const ALL_COUNTRIES = "all"
 
+export const DISTANCES = [100, 250, 500] as const
+export type MaxDistance = (typeof DISTANCES)[number] | null
+const isDistance = (value: number): value is Exclude<MaxDistance, null> =>
+  DISTANCES.some((km) => km === value)
+
 export interface EventFilters {
+  km: MaxDistance
   q: string
   range: Range
   /** ISO-2 code (or whatever `event.country` holds), or ALL_COUNTRIES. */
@@ -41,6 +48,7 @@ export interface EventFilters {
 }
 
 export const DEFAULT_FILTERS: EventFilters = {
+  km: null,
   q: "",
   range: "all",
   country: DEFAULT_COUNTRY,
@@ -51,7 +59,8 @@ export const DEFAULT_FILTERS: EventFilters = {
 type EventLike = Pick<
   BjjEvent,
   "source" | "url" | "title" | "city" | "country" | "startDate"
->
+> &
+  Partial<Pick<BjjEvent, "lat" | "lng">>
 
 const fold = (s: string) =>
   s
@@ -75,6 +84,10 @@ export function matchesFilters(
   }
   if (on("country") && filters.country !== ALL_COUNTRIES) {
     if (event.country !== filters.country) return false
+  }
+  if (on("km") && filters.km !== null) {
+    const distance = distanceFromHome(event)
+    if (distance === null || distance > filters.km) return false
   }
   if (on("org") && filters.org) {
     if (organizerOf(event)?.id !== filters.org) return false
@@ -114,6 +127,7 @@ export function activeFilters(filters: EventFilters): (keyof EventFilters)[] {
   if (filters.country !== DEFAULT_FILTERS.country) out.push("country")
   if (filters.disciplines.length > 0) out.push("disciplines")
   if (filters.org) out.push("org")
+  if (filters.km !== null) out.push("km")
   return out
 }
 
@@ -167,6 +181,8 @@ export function organizerOptions(
 // Only non-default values go into the URL, so the plain "/" stays clean.
 
 export interface CalendarSearch {
+  km?: number
+  view?: "map"
   q?: string
   /** 30 | 90: days ahead. Numeric so the router doesn't quote it. */
   days?: number
@@ -183,6 +199,9 @@ export function validateCalendarSearch(
   raw: Record<string, unknown>
 ): CalendarSearch {
   const out: CalendarSearch = {}
+  const km = Number(raw.km)
+  if (isDistance(km)) out.km = km
+  if (raw.view === "map") out.view = "map"
   const q = str(raw.q)
   if (q) out.q = q
   const days = Number(raw.days)
@@ -202,6 +221,9 @@ export function validateCalendarSearch(
 export function filtersFromSearch(search: CalendarSearch): EventFilters {
   const range = String(search.days)
   return {
+    km: isDistance(Number(search.km))
+      ? (Number(search.km) as Exclude<MaxDistance, null>)
+      : null,
     q: search.q ?? "",
     range: isRange(range) ? range : DEFAULT_FILTERS.range,
     country: search.country ?? DEFAULT_FILTERS.country,
@@ -212,6 +234,7 @@ export function filtersFromSearch(search: CalendarSearch): EventFilters {
 
 export function searchFromFilters(filters: EventFilters): CalendarSearch {
   const out: CalendarSearch = {}
+  if (filters.km !== null) out.km = filters.km
   if (filters.q) out.q = filters.q
   if (filters.range !== "all") out.days = Number(filters.range)
   if (filters.country !== DEFAULT_FILTERS.country) out.country = filters.country

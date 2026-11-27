@@ -2,6 +2,7 @@ import { UNKNOWN_COUNTRY } from "../lib/event-meta"
 import type { EventRow } from "./db"
 import { countryFromCity, countryFromEventPage } from "./ibjjf-countries"
 import { normalizeCity } from "./normalize"
+import { coordinatesFromCity } from "./ibjjf-coordinates"
 
 const BASE_URL = "https://ibjjf.com"
 const API_URL = `${BASE_URL}/api/v1/events/calendar.json`
@@ -121,18 +122,25 @@ export async function fetchIbjjfEvents(): Promise<EventRow[]> {
     )
   }
 
-  return upcoming.map((e, i) => ({
-    id: `ibjjf:${e.id}`,
-    source: "ibjjf",
-    title: e.name.replace(/\s+/g, " ").trim(),
-    // Announced-only events have no page yet.
-    url: BASE_URL + (e.pageUrl ?? "/events/championships"),
-    ...ibjjfDates(e),
-    city: e.city,
-    country: countries[i],
-    lat: null,
-    lng: null,
-    coverImage: null,
-    scrapedAt: now,
-  }))
+  return upcoming.map((e, i) => {
+    const coordinates = coordinatesFromCity(e.city, countries[i])
+    if (!coordinates)
+      console.info(
+        `ibjjf: no coordinates for ${e.city} (${countries[i]}); add it to IBJJF_CITY_COORDINATES`
+      )
+    return {
+      id: `ibjjf:${e.id}`,
+      source: "ibjjf",
+      title: e.name.replace(/\s+/g, " ").trim(),
+      // Announced-only events have no page yet.
+      url: BASE_URL + (e.pageUrl ?? "/events/championships"),
+      ...ibjjfDates(e),
+      city: e.city,
+      country: countries[i],
+      lat: coordinates?.lat ?? null,
+      lng: coordinates?.lng ?? null,
+      coverImage: null,
+      scrapedAt: now,
+    }
+  })
 }

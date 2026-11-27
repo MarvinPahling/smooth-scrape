@@ -13,9 +13,11 @@ import { ArrowDown, ArrowUp, ArrowUpDown, ArrowUpRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { BjjEvent } from "@/lib/collections"
 import { monthYear } from "@/lib/dates"
+import { distanceFromHome } from "@/lib/geo"
 import {
   AddToCalendarButton,
   DateTile,
+  Distance,
   EventMeta,
   Place,
   RowLink,
@@ -50,6 +52,21 @@ const columns = helper.columns([
     sortFn: "alphanumeric",
     sortUndefined: "last",
   }),
+  helper.accessor((event) => distanceFromHome(event) ?? undefined, {
+    id: "distance",
+    header: () => (
+      <span title="Straight-line distance from Brunswick">
+        Distance
+        <span className="block text-[0.65rem] font-normal tracking-normal normal-case">
+          from Brunswick
+        </span>
+      </span>
+    ),
+    sortFn: (a, b) =>
+      (distanceFromHome(a.original) ?? 0) - (distanceFromHome(b.original) ?? 0),
+    sortUndefined: "last",
+    sortDescFirst: false,
+  }),
   helper.display({
     id: "actions",
     header: () => <span className="sr-only">Actions</span>,
@@ -82,12 +99,14 @@ export function EventsTable({
   today,
   empty,
   footer,
+  map,
 }: {
   data: BjjEvent[]
   today: string
   /** Rendered instead of the rows when `data` is empty. */
   empty: ReactNode
   footer: ReactNode
+  map?: ReactNode
 }) {
   const [sorting, setSorting] = useState<SortingState>([
     { id: "startDate", desc: false },
@@ -114,6 +133,8 @@ export function EventsTable({
     <div className="overflow-clip rounded-2xl border border-border bg-card">
       {data.length === 0 ? (
         empty
+      ) : map ? (
+        map
       ) : (
         <>
           {/* Desktop: table. A raw <table> because the ui/table wrapper
@@ -203,6 +224,9 @@ export function EventsTable({
                     <TableCell className="py-2">
                       <Place event={event} className="max-w-[16rem]" />
                     </TableCell>
+                    <TableCell className="py-2">
+                      <Distance event={event} />
+                    </TableCell>
                     <TableCell className="py-2 pr-3">
                       <div className="flex items-center gap-1">
                         <AddToCalendarButton event={event} />
@@ -282,6 +306,7 @@ function EventCard({
         />
         <EventMeta event={event} today={today} />
         <Place event={event} className="text-sm" />
+        <Distance event={event} label />
       </div>
       <AddToCalendarButton event={event} className="-mr-1.5 self-start" />
     </article>

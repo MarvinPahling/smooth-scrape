@@ -103,6 +103,7 @@ describe("URL search round trip", () => {
 
   test("non-defaults survive a round trip", () => {
     const filters: EventFilters = {
+      km: null,
       q: "berlin",
       range: "90",
       country: "FR",
@@ -127,6 +128,31 @@ describe("URL search round trip", () => {
     expect(
       validateCalendarSearch({ days: "7", disc: "foo,nogi", q: 42, org: "" })
     ).toEqual({ disc: "nogi", q: "42" })
+  })
+})
+
+describe("distance and view search", () => {
+  test("distance round-trips; view is validated separately from facets", () => {
+    expect(validateCalendarSearch({ km: "250", view: "map" })).toEqual({
+      km: 250,
+      view: "map",
+    })
+    expect(validateCalendarSearch({ km: -1, view: "junk" })).toEqual({})
+    expect(validateCalendarSearch({ km: 42 })).toEqual({})
+    const filters = { ...DEFAULT_FILTERS, km: 100 as const }
+    expect(filtersFromSearch(searchFromFilters(filters))).toEqual(filters)
+    expect(activeFilters(filters)).toEqual(["km"])
+  })
+  test("maximum distance excludes unknown locations, any distance keeps them", () => {
+    const rows = [
+      ev({ lat: 52.3759, lng: 9.732 }),
+      ev({ lat: 48.8566, lng: 2.3522 }),
+      ev({}),
+    ]
+    expect(filterEvents(rows, { ...DEFAULT_FILTERS, km: 100 }, today)).toEqual([
+      rows[0],
+    ])
+    expect(filterEvents(rows, DEFAULT_FILTERS, today)).toHaveLength(3)
   })
 })
 
