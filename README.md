@@ -1,7 +1,9 @@
 # Mat Calendar (smooth-scraper)
 
 A demo that scrapes upcoming **Brazilian Jiu-Jitsu competitions in Germany**
-from [Smoothcomp](https://smoothcomp.com/en/events/upcoming), stores them in
+from [Smoothcomp](https://smoothcomp.com/en/events/upcoming) and worldwide events
+from [IBJJF](https://ibjjf.com/events/championships) and
+[AJP Tour](https://ajptour.com/en/federation/1), stores them in
 SQLite, and shows them in a server-rendered web app. The visual style uses the
 colours and fonts of [academiabraunschweig.de](https://academiabraunschweig.de/).
 
@@ -28,10 +30,11 @@ hours** while it runs, both in development and in production.
 
 ```sh
 bun install
-bun run dev        # scrapes smoothcomp.com, then serves http://localhost:3100
+bun run dev        # refreshes all three sources, then serves http://localhost:3100
 ```
 
-Open <http://localhost:3100>.
+Open <http://localhost:3100>. The calendar defaults to Germany. To see AJP
+Tour events worldwide, open <http://localhost:3100/?country=all&org=ajp>.
 
 ---
 
@@ -42,7 +45,7 @@ Open <http://localhost:3100>.
 | Requirement     | Version used   | Notes                                                          |
 | --------------- | -------------- | -------------------------------------------------------------- |
 | [Bun][bun]      | 1.4.5          | Required. The app uses `bun:sqlite`, `Bun.serve`, `Bun.spawn`. |
-| Internet access | –              | The server fetches `smoothcomp.com` on start.                  |
+| Internet access | –              | Required to refresh the three event sources.                   |
 | OS              | macOS or Linux | Windows is not tested.                                         |
 
 Node.js is **not** needed. Every command runs on Bun, including Vite.
@@ -69,23 +72,12 @@ The command does these steps in order:
 
 1. A Vite plugin (`scrapeOnDevStart` in `vite.config.ts`) runs the scraper as a
    child process: `bun src/scraper/cli.ts`.
-2. The scraper fetches the Smoothcomp page and writes the events to
-   `events.db`. This takes approximately 2–5 seconds. If the file does not
-   exist, the scraper creates it.
+2. The scraper fetches Smoothcomp, IBJJF and AJP Tour in parallel. Each
+   successful source updates its own rows in `events.db`. The scraper creates
+   the file if needed.
 3. Vite opens port **3100** and serves the app with hot reload.
 4. A timer rescrapes every 24 hours (see
    [Scheduled rescrape](#2-scrape-on-start-and-on-a-schedule-srcscraperon-startts)).
-
-Expected output:
-
-```text
-[scrape] startup: fetching events from smoothcomp.com …
-[scrape] startup: Saved 32 events to events.db (4.6s)
-[scrape] rescraping every 24 h
-
-  VITE v8.4.0  ready in 5288 ms
-  ➜  Local:   http://localhost:3100/
-```
 
 If the scrape fails (for example, when there is no network), the server
 starts anyway and shows the data that is already in `events.db`. If the
@@ -160,12 +152,16 @@ flowchart LR
     S3["startScrapeSchedule<br/>every 24 h"] -->|Bun.spawn| S2
   end
 
-  subgraph Scraper["Scraper (Crawlee)"]
+  subgraph Scraper["Scraper"]
     S2 --> C1[CheerioCrawler]
     C1 -->|GET /en/events/upcoming| SC[(smoothcomp.com)]
     C1 --> C2["extract var events = [...]"]
     C2 --> C3["filter: country DE + BJJ categories"]
-    C3 -->|Drizzle upsert| DB[(events.db<br/>SQLite)]
+    S2 --> I[IBJJF calendar JSON]
+    S2 --> A[AJP Tour upcoming event cards]
+    C3 --> DB[(events.db<br/>SQLite)]
+    I --> DB
+    A --> DB
   end
 
   subgraph App["Web app (TanStack Start)"]
@@ -179,31 +175,17 @@ flowchart LR
 
 ### 1. Scraper: `src/scraper/`
 
-- **Source.** The page `https://smoothcomp.com/en/events/upcoming` contains
-  all upcoming events worldwide (approximately 1,500) as a JavaScript variable
-  `var events = [...]`. The list has no pagination. The `?country=DE` query
-  parameter does not filter this list.
-- **Fetch.** A Crawlee [`CheerioCrawler`][crawlee-cheerio] downloads the page
-  with up to 2 retries. HTTP/2 is turned off in a `preNavigationHook`, because
-  the HTTP/2 agent of got-scraping fails under Bun.
-- **Parse.** `extractEvents()` finds the JSON array in the HTML and parses
-  only that array.
-- **Filter.** The scraper keeps events where:
-  - `location_country === "DE"`, and
-  - `categoryGroups` contains a Jiu-Jitsu group: `1` = Jiu-Jitsu (Gi),
-    `3`, `4`, `7` = Jiu-Jitsu (NoGi). These ids come from the category list on
-    the Smoothcomp page.
-- **Clean.** Postal codes are removed from city names
-  (`63743 Aschaffenburg` → `Aschaffenburg`).
-- **Store.** Rows are upserted by Smoothcomp event id in one transaction
-  with [Drizzle ORM][drizzle-bun] on [`bun:sqlite`][bun-sqlite]. When you run
-  the scraper again, existing rows are updated, not duplicated. The scraper
-  does not delete events that are no longer listed. The app filters out past
-  events instead.
-- **Schema.** `src/scraper/db.ts` defines the `events` table: `id`, `title`,
-  `url`, `start_date`, `end_date`, `city`, `country`, `lat`, `lng`,
-  `cover_image`, `scraped_at`. For this demo, `openDb()` creates the table
-  with `CREATE TABLE IF NOT EXISTS` instead of migrations.
+| Source     | Coverage          | How the adapter reads it                                                                                                                                                                                                                                       |
+| ---------- | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Smoothcomp | German BJJ events | Crawlee downloads the upcoming-events page. The scraper reads the embedded `var events` array and filters by country (`DE`) and category group (`1`, `3`, `4`, `7`).                                                                                           |
+| IBJJF      | Worldwide         | The adapter reads the calendar JSON, excludes finished and past events, and resolves locations by city, falling back to event pages for unknown countries.                                                                                                     |
+| AJP Tour   | Worldwide         | Cheerio reads the upcoming-event cards on the [federation calendar](https://ajptour.com/en/federation/1/events). Each card supplies the event ID, title and date; location, coordinates and cover image are stored when available. Featured cards are ignored. |
+
+All three adapters normalize city names and save rows in `events.db` through
+Drizzle and `bun:sqlite`. IDs include the source (for example, `ajp:1581`).
+Each nonempty result replaces that source’s listing in one transaction:
+existing IDs are updated, new IDs are added, and unlisted IDs are removed.
+A failed or empty result leaves that source’s cached rows untouched.
 
 ### 2. Scrape on start and on a schedule: `src/scraper/on-start.ts`
 
@@ -224,14 +206,11 @@ Two places call them:
 
 Behaviour of the schedule:
 
-- **Upsert only.** Each run updates existing rows and adds new ones. It does
-  not delete events that disappeared from Smoothcomp. The page hides past
-  events.
 - **No overlap.** If a scrape is still running when the timer fires, the new
   run is skipped and a warning is logged.
-- **Failures are harmless.** Every error (spawn failure, network error,
-  non-zero exit code) is logged, `events.db` stays as it was, and the next run
-  tries again.
+- **Partial failures.** If a source fails, the CLI reports its name and exits
+  with an error after the other sources finish. The server keeps running and
+  the next scheduled refresh tries again.
 - **The timer does not keep the process alive.** It is `unref`'d.
 - **The server reads the database on every request.** A rescrape needs no
   restart. A page that is already open shows the new data after a reload.
@@ -330,7 +309,9 @@ same as on the original site.
 ├── events.db                    # SQLite database (created at runtime, git-ignored)
 └── src
     ├── scraper
-    │   ├── scrape.ts            # scrapeEvents(): Crawlee → filter → Drizzle upsert
+    │   ├── scrape.ts            # Smoothcomp adapter and multi-source orchestration
+    │   ├── ibjjf.ts             # worldwide IBJJF calendar adapter
+    │   ├── ajp.ts               # worldwide AJP Tour calendar adapter
     │   ├── cli.ts               # `bun run scrape` entry point
     │   ├── on-start.ts          # scrapeOnStart() + startScrapeSchedule() for dev and prod
     │   ├── db.ts                # Drizzle schema + openDb() on bun:sqlite
@@ -409,16 +390,11 @@ different port. Stop the other process, or change the port in the `dev`
 script. For production, set `PORT`:
 `PORT=4000 bun run start`.
 
-**`[scrape] failed, serving existing events.db`**
-The scraper could not fetch Smoothcomp. The log shows the error. Look for:
-
-- no network connection,
-- Smoothcomp is down or blocks the request,
-- the page layout changed. In that case the log shows
-  ``"`var events` not found - page layout changed?"``. Update
-  `extractEvents()` in `src/scraper/scrape.ts`.
-
-Run `bun run scrape` to see the full Crawlee log.
+**A refresh reports `Scrape failed`**
+Run `bun run scrape` to see which source failed. Check connectivity and the
+source’s response. If AJP reports `upcoming events section not found`, check
+whether the federation calendar markup still matches `src/scraper/ajp.ts`.
+Successful sources can still update while another source is unavailable.
 
 **The page shows "No data yet"**
 `events.db` is empty. Run `bun run scrape`, then reload the page.

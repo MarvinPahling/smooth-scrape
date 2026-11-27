@@ -42,6 +42,7 @@
     "@tanstack/react-router-with-db": "^1.0.0-rc.1",
     "@tanstack/react-start": "latest",
     "@tanstack/react-table": "^9.3.1",
+    "cheerio": "^1.0.0",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.5.2",
     "crawlee": "^3.18.2",

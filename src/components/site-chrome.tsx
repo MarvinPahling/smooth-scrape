@@ -38,13 +38,20 @@ export function SiteFooter() {
             className="text-foreground underline-offset-4 hover:underline"
           >
             smoothcomp.com
-          </a>{" "}
-          and{" "}
+          </a>
+          ,{" "}
           <a
             href="https://ibjjf.com/events/championships"
             className="text-foreground underline-offset-4 hover:underline"
           >
             ibjjf.com
+          </a>
+          , and{" "}
+          <a
+            href="https://ajptour.com/en/federation/1"
+            className="text-foreground underline-offset-4 hover:underline"
+          >
+            ajptour.com
           </a>
           . Check the organizer&apos;s page before you travel.
         </span>

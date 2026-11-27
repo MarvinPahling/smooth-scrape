@@ -1,5 +1,6 @@
 import { CheerioCrawler } from "crawlee"
 import { openDb, type Db, saveEvents, type EventRow } from "./db"
+import { fetchAjpEvents } from "./ajp"
 import { fetchIbjjfEvents } from "./ibjjf"
 import { normalizeCity } from "./normalize"
 
@@ -49,7 +50,7 @@ function findArrayEnd(s: string): number {
 }
 
 /**
- * Scrapes every source and upserts the events into SQLite (Smoothcomp: German BJJ only; IBJJF: all). A
+ * Scrapes every source and upserts the events into SQLite (Smoothcomp: German BJJ; IBJJF and AJP: worldwide). A
  * failing source doesn't stop the others; it throws after all have run.
  * Returns the number of saved events.
  */
@@ -57,7 +58,8 @@ export async function scrapeEvents(dbPath = "events.db"): Promise<number> {
   const db = openDb(dbPath)
   const sources = [
     ["smoothcomp", () => scrapeSmoothcomp(db)],
-    ["ibjjf", () => scrapeIbjjf(db)],
+    ["ibjjf", () => scrapeFederation(db, "ibjjf", fetchIbjjfEvents)],
+    ["ajp", () => scrapeFederation(db, "ajp", fetchAjpEvents)],
   ] as const
   const results = await Promise.allSettled(sources.map(([, run]) => run()))
   let saved = 0
@@ -70,10 +72,14 @@ export async function scrapeEvents(dbPath = "events.db"): Promise<number> {
   return saved
 }
 
-async function scrapeIbjjf(db: Db): Promise<number> {
-  const rows = await fetchIbjjfEvents()
-  saveEvents(db, "ibjjf", rows)
-  console.info(`ibjjf: ${rows.length} upcoming events worldwide`)
+async function scrapeFederation(
+  db: Db,
+  source: string,
+  fetchRows: () => Promise<EventRow[]>
+): Promise<number> {
+  const rows = await fetchRows()
+  saveEvents(db, source, rows)
+  console.info(`${source}: ${rows.length} upcoming events worldwide`)
   return rows.length
 }
 

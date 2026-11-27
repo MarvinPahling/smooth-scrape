@@ -81,7 +81,7 @@ function HeroShell({
             BJJ competitions in {countryName(DEFAULT_COUNTRY)}
           </h1>
           <p className="text-muted-foreground">
-            Smoothcomp tournaments, plus IBJJF events worldwide.
+            Smoothcomp tournaments, plus IBJJF and AJP Tour events worldwide.
           </p>
           <ul className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
             {stats.map((stat) => (

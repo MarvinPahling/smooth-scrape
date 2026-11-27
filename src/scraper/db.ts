@@ -5,7 +5,7 @@ import { sqliteTable, text, real } from "drizzle-orm/sqlite-core"
 
 export const events = sqliteTable("events", {
   id: text("id").primaryKey(), // "<source>:<source event id>"
-  source: text("source").notNull(), // "smoothcomp" | "ibjjf"
+  source: text("source").notNull(), // "smoothcomp" | "ibjjf" | "ajp"
   title: text("title").notNull(),
   url: text("url").notNull(),
   startDate: text("start_date").notNull(), // YYYY-MM-DD

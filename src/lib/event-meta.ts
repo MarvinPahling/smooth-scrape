@@ -76,6 +76,7 @@ function labelFromSubdomain(sub: string): string {
  * the plain smoothcomp.com domain with no known name give null.
  */
 export function organizerOf(event: EventLike): Organizer | null {
+  if (event.source === "ajp") return { id: "ajp", label: "AJP" }
   if (event.source === "ibjjf") return { id: "ibjjf", label: "IBJJF" }
   let sub = ""
   try {
@@ -96,6 +97,7 @@ export function organizerOf(event: EventLike): Organizer | null {
 /** Where the outbound link goes, for button labels: "View on {sourceLabel}". */
 export function sourceLabel(event: Pick<BjjEvent, "url">): string {
   const host = new URL(event.url).hostname
+  if (host === "ajptour.com") return "AJP Tour"
   if (host.endsWith("ibjjf.com")) return "IBJJF"
   if (host.endsWith("smoothcomp.com")) return "Smoothcomp"
   return host.replace(/^www\./, "")
@@ -145,6 +147,7 @@ export const UNKNOWN_COUNTRY = "ZZ"
  */
 export const COUNTRY_NAMES: Record<string, string> = {
   AE: "United Arab Emirates",
+  AO: "Angola",
   AR: "Argentina",
   AT: "Austria",
   AU: "Australia",
@@ -152,6 +155,10 @@ export const COUNTRY_NAMES: Record<string, string> = {
   BR: "Brazil",
   CA: "Canada",
   CH: "Switzerland",
+  CL: "Chile",
+  CO: "Colombia",
+  CR: "Costa Rica",
+  CY: "Cyprus",
   CZ: "Czechia",
   DE: "Germany",
   DK: "Denmark",
@@ -159,24 +166,33 @@ export const COUNTRY_NAMES: Record<string, string> = {
   FI: "Finland",
   FR: "France",
   GB: "United Kingdom",
+  GE: "Georgia",
   HR: "Croatia",
   HU: "Hungary",
   IE: "Ireland",
   IT: "Italy",
+  JO: "Jordan",
   JP: "Japan",
   KR: "South Korea",
+  KW: "Kuwait",
   LU: "Luxembourg",
+  MN: "Mongolia",
   MX: "Mexico",
   MY: "Malaysia",
+  NA: "Namibia",
   NL: "Netherlands",
   NO: "Norway",
   NZ: "New Zealand",
   PL: "Poland",
   PT: "Portugal",
+  QA: "Qatar",
+  RU: "Russia",
   SE: "Sweden",
   SG: "Singapore",
   TH: "Thailand",
+  TR: "Turkey",
   US: "United States",
+  UY: "Uruguay",
   [UNKNOWN_COUNTRY]: "Unknown country",
 }
 

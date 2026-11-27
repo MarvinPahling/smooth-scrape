@@ -93,6 +93,16 @@ describe("organizerOf", () => {
   })
 })
 
+test("AJP Tour source and organizer do not depend on the title", () => {
+  const event = {
+    source: "ajp",
+    url: "https://ajptour.com/en/event/1534",
+    title: "Abu Dhabi Grand Slam",
+  }
+  expect(organizerOf(event)).toEqual({ id: "ajp", label: "AJP" })
+  expect(sourceLabel(event)).toBe("AJP Tour")
+})
+
 test("sourceLabel", () => {
   expect(sourceLabel({ url: "https://ibjjf.com/events/x" })).toBe("IBJJF")
   expect(sourceLabel({ url: "https://jjlg.smoothcomp.com/en/event/1" })).toBe(
