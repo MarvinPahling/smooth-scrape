@@ -63,6 +63,34 @@ export function dateParts(iso: string) {
   }
 }
 
+/** "December 2026": month group headings. */
+export function monthYear(iso: string) {
+  const p = parts(iso)
+  return `${p.month} ${p.year}`
+}
+
+/**
+ * Short "how soon" label for the next two weeks, null after that (the date
+ * already says it). `end` lets multi-day events that already started read
+ * as "Ongoing".
+ */
+export function soonLabel(
+  today: string,
+  start: string,
+  end: string = start
+): string | null {
+  const days = daysBetween(today, start)
+  if (days < 0) return end >= today ? "Ongoing" : null
+  if (days === 0) return "Today"
+  if (days === 1) return "Tomorrow"
+  const startDow = new Date(Date.parse(start)).getUTCDay()
+  const untilSunday = (7 - new Date(Date.parse(today)).getUTCDay()) % 7
+  if ((startDow === 6 || startDow === 0) && days <= untilSunday) {
+    return "This weekend"
+  }
+  return days <= 14 ? `In ${days} days` : null
+}
+
 /** "Saturday, 5 December" */
 export function formatLong(iso: string) {
   const p = parts(iso)
