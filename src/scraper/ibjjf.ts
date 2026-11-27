@@ -1,9 +1,12 @@
+import { UNKNOWN_COUNTRY } from "../lib/event-meta"
 import type { EventRow } from "./db"
+import { countryFromCity, countryFromEventPage } from "./ibjjf-countries"
+import { normalizeCity } from "./normalize"
 
 const BASE_URL = "https://ibjjf.com"
 const API_URL = `${BASE_URL}/api/v1/events/calendar.json`
 
-interface RawIbjjfEvent {
+export interface RawIbjjfEvent {
   id: number
   name: string
   startDay: number
@@ -47,6 +50,44 @@ export function ibjjfDates(e: RawIbjjfEvent) {
   }
 }
 
+/** Downloads an event page's HTML, or null if that fails. */
+async function fetchPage(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url)
+    return res.ok ? await res.text() : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Finds an ISO-2 country per city: the lookup table first, then (once per
+ * city) the event page. Unresolved cities get UNKNOWN_COUNTRY and are
+ * returned in `unmapped` so the caller can log them.
+ */
+export async function resolveIbjjfCountries(
+  events: { city: string | null; region: string; url: string | null }[],
+  loadPage: (url: string) => Promise<string | null> = fetchPage
+): Promise<{ countries: string[]; unmapped: Map<string, string> }> {
+  const byCity = new Map<string, string | null>()
+  const unmapped = new Map<string, string>() // "city (region)" → example url
+  const countries: string[] = []
+  for (const e of events) {
+    const key = e.city ?? ""
+    if (!byCity.has(key)) byCity.set(key, countryFromCity(e.city))
+    let code = byCity.get(key) ?? null
+    if (!code && e.url) {
+      const html = await loadPage(e.url)
+      code = html ? countryFromEventPage(html) : null
+      if (code) byCity.set(key, code)
+    }
+    if (!code)
+      unmapped.set(`${e.city ?? "(no city)"} (${e.region})`, e.url ?? "")
+    countries.push(code ?? UNKNOWN_COUNTRY)
+  }
+  return { countries, unmapped }
+}
+
 /** Fetches the IBJJF calendar and maps the upcoming events to rows. */
 export async function fetchIbjjfEvents(): Promise<EventRow[]> {
   const res = await fetch(API_URL, {
@@ -62,21 +103,36 @@ export async function fetchIbjjfEvents(): Promise<EventRow[]> {
   }
 
   const now = new Date().toISOString()
-  return body.infosite_events
-    .filter((e) => e.status !== "finished")
-    .map((e) => ({
-      id: `ibjjf:${e.id}`,
-      source: "ibjjf",
-      title: e.name.trim(),
-      // Announced-only events have no page yet.
-      url: BASE_URL + (e.pageUrl ?? "/events/championships"),
-      ...ibjjfDates(e),
-      city: e.city?.trim() || null,
-      // The calendar has no country field, so keep the region instead.
-      country: e.region,
-      lat: null,
-      lng: null,
-      coverImage: null,
-      scrapedAt: now,
+  const today = now.slice(0, 10)
+  const upcoming = body.infosite_events
+    // Some long-past events are never marked "finished"; check the date too.
+    .filter((e) => e.status !== "finished" && ibjjfDates(e).endDate >= today)
+    .map((e) => ({ ...e, city: normalizeCity(e.city) }))
+  const { countries, unmapped } = await resolveIbjjfCountries(
+    upcoming.map((e) => ({
+      city: e.city,
+      region: e.region,
+      url: e.pageUrl && BASE_URL + e.pageUrl,
     }))
+  )
+  for (const [city, url] of unmapped) {
+    console.info(
+      `ibjjf: no country for ${city}${url ? ` ${url}` : ""}; add it to IBJJF_CITY_COUNTRY`
+    )
+  }
+
+  return upcoming.map((e, i) => ({
+    id: `ibjjf:${e.id}`,
+    source: "ibjjf",
+    title: e.name.replace(/\s+/g, " ").trim(),
+    // Announced-only events have no page yet.
+    url: BASE_URL + (e.pageUrl ?? "/events/championships"),
+    ...ibjjfDates(e),
+    city: e.city,
+    country: countries[i],
+    lat: null,
+    lng: null,
+    coverImage: null,
+    scrapedAt: now,
+  }))
 }

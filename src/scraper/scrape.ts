@@ -1,6 +1,7 @@
 import { CheerioCrawler } from "crawlee"
 import { openDb, type Db, saveEvents, type EventRow } from "./db"
 import { fetchIbjjfEvents } from "./ibjjf"
+import { normalizeCity } from "./normalize"
 
 const START_URL = "https://smoothcomp.com/en/events/upcoming?country=DE"
 const COUNTRY = "DE"
@@ -100,9 +101,9 @@ async function scrapeSmoothcomp(db: Db): Promise<number> {
           url: e.url,
           startDate: e.startdate,
           endDate: e.enddate,
-          // Some cities come with a postal code prefix ("63743 Aschaffenburg").
-          city: e.location_city?.replace(/^\d{5}\s+/, "").trim() || null,
-          country: e.location_country,
+          // Drops postal codes ("63743 Aschaffenburg"), unifies spellings.
+          city: normalizeCity(e.location_city),
+          country: e.location_country.toUpperCase(),
           lat: e.location_lat ? Number(e.location_lat) : null,
           lng: e.location_long ? Number(e.location_long) : null,
           coverImage: e.cover_image ?? null,
