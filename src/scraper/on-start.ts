@@ -18,7 +18,7 @@ async function runScrape(label: string): Promise<void> {
     return
   }
   running = true
-  console.info(`[scrape] ${label}: fetching events from smoothcomp.com …`)
+  console.info(`[scrape] ${label}: fetching events …`)
   const started = performance.now()
   let code: number
   let out = ""

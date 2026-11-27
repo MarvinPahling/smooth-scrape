@@ -1,5 +1,6 @@
 import { CheerioCrawler } from "crawlee"
-import { openDb, events, type EventRow } from "./db"
+import { openDb, type Db, saveEvents, type EventRow } from "./db"
+import { fetchIbjjfEvents } from "./ibjjf"
 
 const START_URL = "https://smoothcomp.com/en/events/upcoming?country=DE"
 const COUNTRY = "DE"
@@ -47,11 +48,35 @@ function findArrayEnd(s: string): number {
 }
 
 /**
- * Fetches the upcoming-events page once and upserts the German BJJ events
- * into SQLite. Returns the number of saved events.
+ * Scrapes every source and upserts the events into SQLite (Smoothcomp: German BJJ only; IBJJF: all). A
+ * failing source doesn't stop the others; it throws after all have run.
+ * Returns the number of saved events.
  */
 export async function scrapeEvents(dbPath = "events.db"): Promise<number> {
   const db = openDb(dbPath)
+  const sources = [
+    ["smoothcomp", () => scrapeSmoothcomp(db)],
+    ["ibjjf", () => scrapeIbjjf(db)],
+  ] as const
+  const results = await Promise.allSettled(sources.map(([, run]) => run()))
+  let saved = 0
+  const failures: string[] = []
+  results.forEach((r, i) => {
+    if (r.status === "fulfilled") saved += r.value
+    else failures.push(`${sources[i][0]}: ${r.reason}`)
+  })
+  if (failures.length) throw new Error(`Scrape failed - ${failures.join("; ")}`)
+  return saved
+}
+
+async function scrapeIbjjf(db: Db): Promise<number> {
+  const rows = await fetchIbjjfEvents()
+  saveEvents(db, rows)
+  console.info(`ibjjf: ${rows.length} upcoming events worldwide`)
+  return rows.length
+}
+
+async function scrapeSmoothcomp(db: Db): Promise<number> {
   let saved = 0
 
   const crawler = new CheerioCrawler({
@@ -69,7 +94,8 @@ export async function scrapeEvents(dbPath = "events.db"): Promise<number> {
         .filter((e) => e.location_country === COUNTRY)
         .filter((e) => e.categoryGroups.some((g) => BJJ_GROUPS.has(g)))
         .map((e) => ({
-          id: e.id,
+          id: `smoothcomp:${e.id}`,
+          source: "smoothcomp",
           title: e.title.trim(),
           url: e.url,
           startDate: e.startdate,
@@ -84,14 +110,7 @@ export async function scrapeEvents(dbPath = "events.db"): Promise<number> {
         }))
 
       log.info(`${all.length} events on page, ${rows.length} BJJ in ${COUNTRY}`)
-      db.transaction((tx) => {
-        for (const row of rows) {
-          tx.insert(events)
-            .values(row)
-            .onConflictDoUpdate({ target: events.id, set: row })
-            .run()
-        }
-      })
+      saveEvents(db, rows)
       saved = rows.length
     },
   })
