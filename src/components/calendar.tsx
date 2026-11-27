@@ -20,6 +20,7 @@ import {
   ALL_COUNTRIES,
   DEFAULT_FILTERS,
   DISCIPLINES,
+  DISTANCES,
   RANGES,
   activeFilters,
   countryOptions,
@@ -30,10 +31,12 @@ import {
   searchFromFilters,
   type EventFilters,
   type Option,
+  type MaxDistance,
 } from "@/lib/event-filters"
 import { DISCIPLINE_LABELS, type Discipline } from "@/lib/event-meta"
 import { buildCalendar, downloadIcs } from "@/lib/ics"
 import { EventsTable } from "@/components/events-table"
+import { EventsMap } from "@/components/events-map"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
@@ -67,8 +70,10 @@ function useFilters() {
   const filters = useMemo(() => filtersFromSearch(search), [search])
   const update = (patch: Partial<EventFilters>) =>
     navigate({
-      search: (prev) =>
-        searchFromFilters({ ...filtersFromSearch(prev), ...patch }),
+      search: (prev) => ({
+        ...searchFromFilters({ ...filtersFromSearch(prev), ...patch }),
+        view: prev.view,
+      }),
       replace: true,
       resetScroll: false,
     })
@@ -78,6 +83,9 @@ function useFilters() {
 function CalendarBody({ today }: { today: string }) {
   const { data: upcoming } = useUpcomingEvents(today)
   const [filters, setFilters] = useFilters()
+  const search = route.useSearch()
+  const navigate = route.useNavigate()
+  const view = search.view ?? "list"
 
   // The search box keeps its own state so typing never waits on the
   // router; the URL catches up after a short pause.
@@ -107,10 +115,17 @@ function CalendarBody({ today }: { today: string }) {
   const organizers = organizerOptions(inCountry, filters.org)
 
   // For the empty state: how many results each relaxation would bring back.
-  const relaxed = (facets: ("range" | "country")[]) =>
+  const relaxed = (facets: ("range" | "country" | "km")[]) =>
     upcoming.filter((e) => matchesFilters(e, effective, today, facets)).length
   const suggestions: Suggestion[] = []
   if (shown.length === 0) {
+    if (filters.km !== null) {
+      suggestions.push({
+        label: "Any distance",
+        count: relaxed(["km"]),
+        apply: () => setFilters({ km: null }),
+      })
+    }
     const ranged = filters.range !== "all"
     const localized = filters.country !== ALL_COUNTRIES
     if (ranged) {
@@ -149,7 +164,56 @@ function CalendarBody({ today }: { today: string }) {
         activeCount={active.length}
         onClear={clearAll}
       />
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <p
+          className="text-xs text-muted-foreground"
+          title="Straight-line distance, not driving distance"
+        >
+          Distances from Brunswick · straight-line
+        </p>
+        <div
+          className="inline-flex rounded-full border border-border bg-card p-1"
+          aria-label="Calendar view"
+          role="group"
+        >
+          {(["list", "map"] as const).map((value) => (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={view === value}
+              className={cn(
+                "min-h-9 rounded-full px-5 text-sm font-semibold",
+                view === value
+                  ? "bg-foreground text-white"
+                  : "text-muted-foreground hover:bg-muted"
+              )}
+              onClick={() =>
+                navigate({
+                  search: (prev) => ({
+                    ...prev,
+                    view: value === "map" ? "map" : undefined,
+                  }),
+                  replace: true,
+                  resetScroll: false,
+                })
+              }
+            >
+              {value === "map" ? "Map" : "List"}
+            </button>
+          ))}
+        </div>
+      </div>
       <EventsTable
+        map={
+          view === "map" ? (
+            <EventsMap
+              events={shown}
+              today={today}
+              country={filters.country}
+              km={filters.km}
+            />
+          ) : undefined
+        }
         data={shown}
         today={today}
         empty={
@@ -219,7 +283,8 @@ function FilterBar({
   const hiddenCount =
     filters.disciplines.length +
     (filters.country !== DEFAULT_FILTERS.country ? 1 : 0) +
-    (filters.org ? 1 : 0)
+    (filters.org ? 1 : 0) +
+    (filters.km !== null ? 1 : 0)
 
   return (
     <div className="mb-4 flex flex-col gap-2 rounded-2xl border border-border bg-card p-2.5">
@@ -325,6 +390,26 @@ function FilterBar({
           ]}
           highlighted={filters.org !== ""}
         />
+        <div
+          className="w-full md:w-auto"
+          title="Straight-line distance from Brunswick"
+        >
+          <PillSelect
+            label="Max distance from Brunswick"
+            value={filters.km === null ? "" : String(filters.km)}
+            onChange={(value) =>
+              onChange({ km: value ? (Number(value) as MaxDistance) : null })
+            }
+            options={[
+              { value: "", label: "Max distance: Any" },
+              ...DISTANCES.map((km) => ({
+                value: String(km),
+                label: `Max distance: ${km} km`,
+              })),
+            ]}
+            highlighted={filters.km !== null}
+          />
+        </div>
         {activeCount > 0 && (
           <button
             type="button"
@@ -350,7 +435,7 @@ function PillSelect({
   label: string
   value: string
   onChange: (value: string) => void
-  options: Option[]
+  options: { value: string; label: string; count?: number }[]
   highlighted: boolean
 }) {
   return (
@@ -367,7 +452,8 @@ function PillSelect({
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>
-            {o.label} ({o.count})
+            {o.label}
+            {o.count !== undefined && ` (${o.count})`}
           </option>
         ))}
       </select>

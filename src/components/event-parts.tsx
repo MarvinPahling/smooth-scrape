@@ -4,6 +4,7 @@ import { CalendarPlus, MapPin } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { BjjEvent } from "@/lib/collections"
 import { dateParts, soonLabel } from "@/lib/dates"
+import { distanceFromHome, formatDistance } from "@/lib/geo"
 import {
   DEFAULT_COUNTRY,
   DISCIPLINE_LABELS,
@@ -167,6 +168,25 @@ export function Place({
           )}
         </span>
       )}
+    </span>
+  )
+}
+
+/** Stable formatting shared by list, mobile cards and the map. */
+export function Distance({
+  event,
+  label = false,
+}: {
+  event: BjjEvent
+  label?: boolean
+}) {
+  return (
+    <span
+      title="Straight-line distance from Brunswick"
+      className="text-sm whitespace-nowrap text-muted-foreground tabular-nums"
+    >
+      {formatDistance(distanceFromHome(event))}
+      {label && " from Brunswick"}
     </span>
   )
 }
