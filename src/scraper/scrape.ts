@@ -71,7 +71,7 @@ export async function scrapeEvents(dbPath = "events.db"): Promise<number> {
 
 async function scrapeIbjjf(db: Db): Promise<number> {
   const rows = await fetchIbjjfEvents()
-  saveEvents(db, rows)
+  saveEvents(db, "ibjjf", rows)
   console.info(`ibjjf: ${rows.length} upcoming events worldwide`)
   return rows.length
 }
@@ -110,7 +110,7 @@ async function scrapeSmoothcomp(db: Db): Promise<number> {
         }))
 
       log.info(`${all.length} events on page, ${rows.length} BJJ in ${COUNTRY}`)
-      saveEvents(db, rows)
+      saveEvents(db, "smoothcomp", rows)
       saved = rows.length
     },
   })

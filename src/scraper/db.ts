@@ -1,4 +1,5 @@
 import { Database } from "bun:sqlite"
+import { and, eq, notInArray } from "drizzle-orm"
 import { drizzle } from "drizzle-orm/bun-sqlite"
 import { sqliteTable, text, real } from "drizzle-orm/sqlite-core"
 
@@ -39,9 +40,26 @@ export function openDb(path = "events.db") {
 
 export type Db = ReturnType<typeof openDb>
 
-/** Upserts rows in one transaction. */
-export function saveEvents(db: Db, rows: EventRow[]) {
+/**
+ * Upserts one source's rows in one transaction and deletes that source's
+ * rows that are no longer listed (cancelled or past events). An empty `rows`
+ * deletes nothing, so a broken scrape never wipes the cache.
+ */
+export function saveEvents(db: Db, source: string, rows: EventRow[]) {
   db.transaction((tx) => {
+    if (rows.length > 0) {
+      tx.delete(events)
+        .where(
+          and(
+            eq(events.source, source),
+            notInArray(
+              events.id,
+              rows.map((r) => r.id)
+            )
+          )
+        )
+        .run()
+    }
     for (const row of rows) {
       tx.insert(events)
         .values(row)
