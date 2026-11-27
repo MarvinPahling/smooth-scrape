@@ -15,10 +15,11 @@ export const Route = createRootRouteWithContext<RouterContext>()({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Mat Calendar · BJJ competitions in Germany" },
+      { title: "Mat Calendar · BJJ competitions in Germany and IBJJF events" },
       {
         name: "description",
-        content: "Upcoming Brazilian Jiu-Jitsu competitions in Germany.",
+        content:
+          "Upcoming Brazilian Jiu-Jitsu competitions in Germany from Smoothcomp, plus international IBJJF events. Search, filter by country and sort in one calendar.",
       },
     ],
     links: [{ rel: "stylesheet", href: appCss }],
